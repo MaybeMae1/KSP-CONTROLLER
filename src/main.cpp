@@ -113,7 +113,7 @@ void joystickRotation(int potX, int potY, int potZ, int deadzoneRange)
   // do some black magic to tell the game how we want to move
   rot_msg.setPitch(-pitch);
   rot_msg.setRoll(roll);
-  rot_msg.setYaw(-yaw);
+  rot_msg.setYaw(yaw);
   mySimpit.send(ROTATION_MESSAGE, rot_msg);
 }
 // handles joystick Translational inputs (basically identical to rotation, but now they can be tweaked individually)
@@ -161,8 +161,13 @@ void throttleHandler(int potT, int deadzoneRange)
   // Read the value of the potentiometer
   int reading = analogRead(potT);
 
+  /* DEPRECATED - the throttle slider is not linear, thus the curved mapping function gives more intuitive control over the throttle in game
   // Convert it in KerbalSimpit range (only 0 -> INT16_MAX bc throttle cant be negative)
   int throttle = map(reading, 0, 1023, 0, INT16_MAX);
+  */
+
+  // Convert it into KerbalSimpit range, now with an exponential curve to account for non-linearity in the slider 
+  int throttle = exp(.010163 * reading);
 
   // Add a deadzone for the axis
   if (throttle < deadzoneRange)
