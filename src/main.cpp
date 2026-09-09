@@ -1,7 +1,16 @@
 #include "Arduino.h"
 #include "KerbalSimpit.h"
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include "Adafruit_LEDBackpack.h"
+#include <EasyStringStream.h>
+
 
 KerbalSimpit mySimpit(Serial);
+Adafruit_AlphaNum4 display0 = Adafruit_AlphaNum4();
+Adafruit_AlphaNum4 display1 = Adafruit_AlphaNum4();
+Adafruit_AlphaNum4 display2 = Adafruit_AlphaNum4();
+
 
 // VARIABLES
 
@@ -18,13 +27,64 @@ const int joystickDeadzone = 4000;
 // throttle variables
 const int Throttle_Potentiometer = A3;
 const int throttle_Deadzone = 3000;
-
 // dbPress_Toggle variables
 unsigned long lastDebounceTime = 0; // the last time the output pin was toggled
 unsigned long debounceDelay = 50;   // the debounce time; increase if the output flickers
 int outputState;                    // the current state of the output pin
 int buttonState;                    // the current reading from the input pin
 int lastButtonState;                // the previous reading from the input pin
+
+//enum for all display states
+enum displayStates {
+  Auto,
+  Orbit,
+  Surface,
+  Rendezvous,
+  Maneuver
+};
+
+//Set display state to auto on startup
+int displayState = Auto;
+
+//situations the vessel can be in (used for auto display)
+enum Situations{
+  PreLaunch = 0,
+  Flying = 3,
+  SubOrbital = 4,
+  Orbiting = 5
+};
+
+// GAME DATA
+
+
+// flying and landing info
+float currentAltitudeSeaLevel;
+float currentAltitudeSurface;
+float currentSurfaceVelocity;
+
+// orbital info
+float currentVelocity;
+float currentPeriapsis;
+float currentApoapsis;
+float currentInclination;
+
+// docking info
+float currentDistanceToTarget;
+float currentTargetRelativeVelocity;
+
+// rendezvous info
+float currentTimeToNextIntercept;
+float currentDistanceAtNextIntercept;
+float currentVelocityAtNextIntercept;
+
+// maneuver info
+float currentTimeToNextManeuver;
+float currentDeltaVNextManeuver;
+float currentDurationNextManeuver;
+
+// situation info 
+int currentSituation;
+bool hasTarget;
 
 // FUNCTIONS
 
@@ -67,6 +127,7 @@ int dbPress_Toggle(int input_pin)
 
   return outputState;
 }
+
 // maps the yaw axis input bc it acts weirdly compared to pitch and roll
 int yawMap(int x)
 {
@@ -80,6 +141,7 @@ int yawMap(int x)
   };
   return 0;
 }
+
 // handles joystick Rotational inputs
 void joystickRotation(int potX, int potY, int potZ, int deadzoneRange)
 {
@@ -116,6 +178,7 @@ void joystickRotation(int potX, int potY, int potZ, int deadzoneRange)
   rot_msg.setYaw(yaw);
   mySimpit.send(ROTATION_MESSAGE, rot_msg);
 }
+
 // handles joystick Translational inputs (basically identical to rotation, but now they can be tweaked individually)
 void joystickTranslation(int potX, int potY, int potZ, int deadzoneRange)
 {
@@ -152,6 +215,7 @@ void joystickTranslation(int potX, int potY, int potZ, int deadzoneRange)
   trans_msg.setZ(z);
   mySimpit.send(TRANSLATION_MESSAGE, trans_msg);
 }
+
 // handles throttle inputs (its practically the joystick code, just with only one input lol)
 void throttleHandler(int potT, int deadzoneRange)
 {
@@ -161,13 +225,13 @@ void throttleHandler(int potT, int deadzoneRange)
   // Read the value of the potentiometer
   int reading = analogRead(potT);
 
-  /* DEPRECATED - the throttle slider is not linear, thus the curved mapping function gives more intuitive control over the throttle in game
+  /* DEPRECATED - the throttle slider is not linear, thus the curved mapping function gives more intuitive control over the throttle in game 
   // Convert it in KerbalSimpit range (only 0 -> INT16_MAX bc throttle cant be negative)
   int throttle = map(reading, 0, 1023, 0, INT16_MAX);
   */
 
   // Convert it into KerbalSimpit range, now with an exponential curve to account for non-linearity in the slider 
-  int throttle = exp(.010163 * reading);
+  int throttle = exp(.010163 * (-1 * reading));
 
   // Add a deadzone for the axis
   if (throttle < deadzoneRange)
@@ -180,12 +244,99 @@ void throttleHandler(int potT, int deadzoneRange)
   mySimpit.send(THROTTLE_MESSAGE, throttle_msg);
 }
 
+// Handles the staging button :mind_blown:
+void stagingButtonHandler(int pin){
+
+  if(dbPress_Toggle(pin)){
+    mySimpit.activateAction(STAGE_ACTION);
+  }
+
+}
+
+
+
+
+
+
+
+
 // handles incoming messages (duh)
 // dont even dare ask me how it works, im just looking at the docs for simpit lol
 void messageHandler(byte messageType, byte message[], byte messageSize)
 {
   switch (messageType)
   {
+
+  case VELOCITY_MESSAGE:
+    if (messageSize == sizeof(velocityMessage))
+    {
+      velocityMessage myVelocity;
+      myVelocity = parseMessage<velocityMessage>(message);
+      currentVelocity = myVelocity.orbital;
+      currentSurfaceVelocity = myVelocity.surface;
+    }
+  break;
+  
+  case ORBIT_MESSAGE:
+    if (messageSize == sizeof(orbitInfoMessage))
+    {
+      orbitInfoMessage myOrbit;
+      myOrbit = parseMessage<orbitInfoMessage>(message);
+      currentInclination = myOrbit.inclination;
+    }
+  break;
+
+  case APSIDES_MESSAGE:
+    if (messageSize == sizeof(apsidesMessage))
+    {
+      apsidesMessage myApsides;
+      myApsides = parseMessage<apsidesMessage>(message);
+      currentApoapsis = myApsides.apoapsis;
+      currentPeriapsis = myApsides.periapsis;
+    }
+  break;
+
+  case MANEUVER_MESSAGE:
+    if (messageSize == sizeof(maneuverMessage))
+    {
+      maneuverMessage myManeuver;
+      myManeuver = parseMessage<maneuverMessage>(message);
+      currentTimeToNextManeuver = myManeuver.timeToNextManeuver;
+      currentDeltaVNextManeuver = myManeuver.deltaVNextManeuver;
+      currentDurationNextManeuver = myManeuver.durationNextManeuver;
+    }
+  break;
+
+  case TARGETINFO_MESSAGE:
+    if (messageSize == sizeof(targetMessage))
+    {
+      targetMessage myTarget;
+      myTarget = parseMessage<targetMessage>(message);
+      currentTargetRelativeVelocity = myTarget.velocity;
+      currentDistanceToTarget = myTarget.distance;
+    }
+  break;
+
+  case INTERSECTS_MESSAGE:
+    if (messageSize == sizeof(intersectsMessage))
+    {
+      intersectsMessage myIntersect;
+      myIntersect = parseMessage<intersectsMessage>(message);
+      currentTimeToNextIntercept = myIntersect.timeToIntersect1;
+      currentDistanceAtNextIntercept = myIntersect.distanceAtIntersect1;
+      currentVelocityAtNextIntercept = myIntersect.velocityAtIntersect1;
+    }
+  break;
+
+  case FLIGHT_STATUS_MESSAGE:
+    if (messageSize == sizeof(flightStatusMessage))
+    {
+      flightStatusMessage myStatus;
+      myStatus = parseMessage<flightStatusMessage>(message);
+      currentSituation = myStatus.vesselSituation;
+      hasTarget = myStatus.hasTarget();
+    }
+  break;
 
   case ALTITUDE_MESSAGE:
     // Checking if the message is the size we expect is a very basic
@@ -196,18 +347,10 @@ void messageHandler(byte messageType, byte message[], byte messageSize)
       altitudeMessage myAltitude;
       // Convert the message we received to an Altitude struct.
       myAltitude = parseMessage<altitudeMessage>(message);
-      // Turn the LED on if the vessel is higher than 500 metres
-      // above sea level. Otherwise turn it off.
-      if (myAltitude.sealevel > 500)
-      {
-        digitalWrite(LED_BUILTIN, HIGH);
-      }
-      else
-      {
-        digitalWrite(LED_BUILTIN, LOW);
-      }
+      currentAltitudeSeaLevel = myAltitude.sealevel;
+      currentAltitudeSurface = myAltitude.surface;
     }
-    break;
+  break;
 
   case ACTIONSTATUS_MESSAGE:
     if (messageSize == 1)
@@ -237,6 +380,11 @@ void setup()
   // set up pins
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(SAS_SWITCH_PIN, INPUT);
+
+  // setup displays
+  display0.begin(0x70);  // pass in the address
+  display1.begin(0x71);
+  display2.begin(0x72);
 
   // handshake with plugin, prints message to screen and turns of led when connected
   digitalWrite(LED_BUILTIN, HIGH);
@@ -285,4 +433,6 @@ void loop()
   joystickRotation(X_Potentiometer, Y_Potentiometer, Z_Potentiometer, joystickDeadzone);
 
   throttleHandler(Throttle_Potentiometer, throttle_Deadzone);
+
+  stagingButtonHandler(SAS_SWITCH_PIN);
 }
