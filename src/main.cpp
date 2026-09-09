@@ -33,7 +33,6 @@ unsigned long debounceDelay = 50;   // the debounce time; increase if the output
 int outputState;                    // the current state of the output pin
 int buttonState;                    // the current reading from the input pin
 int lastButtonState;                // the previous reading from the input pin
-
 //enum for all display states
 enum displayStates {
   Auto,
@@ -42,10 +41,8 @@ enum displayStates {
   Rendezvous,
   Maneuver
 };
-
 //Set display state to auto on startup
 int displayState = Auto;
-
 //situations the vessel can be in (used for auto display)
 enum Situations{
   PreLaunch = 0,
@@ -53,9 +50,12 @@ enum Situations{
   SubOrbital = 4,
   Orbiting = 5
 };
+//buffers for the displays
+char displaybuffer[12] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+char databuffer[12] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+
 
 // GAME DATA
-
 
 // flying and landing info
 float currentAltitudeSeaLevel;
@@ -85,6 +85,7 @@ float currentDurationNextManeuver;
 // situation info 
 int currentSituation;
 bool hasTarget;
+
 
 // FUNCTIONS
 
@@ -244,7 +245,7 @@ void throttleHandler(int potT, int deadzoneRange)
   mySimpit.send(THROTTLE_MESSAGE, throttle_msg);
 }
 
-// Handles the staging button :mind_blown:
+// handles the staging button :mind_blown:
 void stagingButtonHandler(int pin){
 
   if(dbPress_Toggle(pin)){
@@ -253,11 +254,79 @@ void stagingButtonHandler(int pin){
 
 }
 
+// moves data from data buffer to display buffer
+void displayAlloc(char* data,  char* buffer){
+  for(int i = 0; i < 12; i++ ){
+    buffer[i]=data[i];
+  }
+}
+
+// writes to all displays in bank 1
+void writeDisplayBank1(char* buffer){
+  display0.writeDigitAscii(0, buffer[0]);
+  display0.writeDigitAscii(1, buffer[1]);
+  display0.writeDigitAscii(2, buffer[2]);
+  display0.writeDigitAscii(3, buffer[3]);
+  display1.writeDigitAscii(0, buffer[4]);
+  display1.writeDigitAscii(1, buffer[5]);
+  display1.writeDigitAscii(2, buffer[6]);
+  display1.writeDigitAscii(3, buffer[7]);
+  display2.writeDigitAscii(0, buffer[8]);
+  display2.writeDigitAscii(1, buffer[9]);
+  display2.writeDigitAscii(2, buffer[10]);
+  display2.writeDigitAscii(3, buffer[11]);
 
 
+  display2.writeDisplay();
+  display1.writeDisplay();
+  display0.writeDisplay();
+}
+
+// clears display bank 1
+void clearDisplayBank1(){
+  display2.clear();
+  display1.clear();
+  display0.clear();
+}
+
+// converts arbitrary floats into a character array, with auto adjusting units
+void floatToCharArray(char* buffer, float input, String unit) {
 
 
+  if(input > 1000000){
+    input = input / 1000000;
+    unit = "M" + unit;
+  } else if(input > 1000){
+    input = input / 1000;
+    unit = "K" + unit;
+  }
 
+
+  EasyStringStream ss(buffer, 12);
+  ss << input;
+  String str(ss.get());
+
+
+  int offset = 12 - str.length() - unit.length();
+  if(offset < 0){
+    floatToCharArray(buffer, input/10,unit);
+  }
+
+
+  for(int i = 0; i < 12; i++){
+    buffer[i + offset] = str[i];
+  }
+
+
+  for(int i = 0; i < unit.length(); i++){
+    buffer[12 - unit.length() + i] = unit[i];
+  }
+
+
+  for(int i = 0; i < offset; i++){
+    buffer[offset - i - 1] = ' ';
+  }
+}
 
 
 // handles incoming messages (duh)
@@ -375,6 +444,7 @@ void messageHandler(byte messageType, byte message[], byte messageSize)
 void setup()
 {
   // Open connection
+
   Serial.begin(115200);
 
   // set up pins
@@ -401,6 +471,7 @@ void setup()
   // tells the plugin to send certain messages regularly when in flight
   mySimpit.registerChannel(ACTIONSTATUS_MESSAGE);
   mySimpit.registerChannel(ALTITUDE_MESSAGE);
+  mySimpit.registerChannel(VELOCITY_MESSAGE);
 }
 
 void loop()
@@ -419,7 +490,7 @@ void loop()
   /*
   Desired_SAS_State = dbPress_Toggle(SAS_SWITCH_PIN);
 
-  // Update the SAS to match the state, only if a change is needed to avoid spamming commands.
+  Update the SAS to match the state, only if a change is needed to avoid spamming commands.
   if(Desired_SAS_State){
     mySimpit.printToKSP("Activate SAS!");
     mySimpit.activateAction(SAS_ACTION);
@@ -430,9 +501,20 @@ void loop()
   }
   */
 
-  joystickRotation(X_Potentiometer, Y_Potentiometer, Z_Potentiometer, joystickDeadzone);
+  //joystickRotation(X_Potentiometer, Y_Potentiometer, Z_Potentiometer, joystickDeadzone);
 
-  throttleHandler(Throttle_Potentiometer, throttle_Deadzone);
+  //throttleHandler(Throttle_Potentiometer, throttle_Deadzone);
 
-  stagingButtonHandler(SAS_SWITCH_PIN);
+  //stagingButtonHandler(SAS_SWITCH_PIN);
+
+  // clear display banks 
+  clearDisplayBank1();
+
+  floatToCharArray(databuffer, currentVelocity, "m/s");
+  displayAlloc(databuffer,displaybuffer);
+
+  // write do display banks
+  writeDisplayBank1(displaybuffer);
+  
+  delay(50);
 }
