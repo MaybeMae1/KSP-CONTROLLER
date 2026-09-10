@@ -4,35 +4,50 @@
 #include <Adafruit_GFX.h>
 #include "Adafruit_LEDBackpack.h"
 #include <EasyStringStream.h>
+#include <SoftWire.h>
 
 
 KerbalSimpit mySimpit(Serial);
 Adafruit_AlphaNum4 display0 = Adafruit_AlphaNum4();
 Adafruit_AlphaNum4 display1 = Adafruit_AlphaNum4();
 Adafruit_AlphaNum4 display2 = Adafruit_AlphaNum4();
+Adafruit_AlphaNum4 display3 = Adafruit_AlphaNum4();
+Adafruit_AlphaNum4 display4 = Adafruit_AlphaNum4();
+Adafruit_AlphaNum4 display5 = Adafruit_AlphaNum4();
+Adafruit_AlphaNum4 display6 = Adafruit_AlphaNum4();
+Adafruit_AlphaNum4 display7 = Adafruit_AlphaNum4();
+Adafruit_AlphaNum4 display8 = Adafruit_AlphaNum4();
 
+SoftWire Bus2(12, 13);
 
 // VARIABLES
 
+// pins
 const int SAS_SWITCH_PIN = 1;
 const int Alt_Warning_Pin = 2;
+
+// misc
 bool SAS_Switch_State;
 bool Desired_SAS_State;
 byte currentActionStatus;
+
 // joystick variables
 const int X_Potentiometer = A0;
 const int Y_Potentiometer = A1;
 const int Z_Potentiometer = A2;
 const int joystickDeadzone = 4000;
+
 // throttle variables
 const int Throttle_Potentiometer = A3;
 const int throttle_Deadzone = 3000;
 // dbPress_Toggle variables
+
 unsigned long lastDebounceTime = 0; // the last time the output pin was toggled
 unsigned long debounceDelay = 50;   // the debounce time; increase if the output flickers
 int outputState;                    // the current state of the output pin
 int buttonState;                    // the current reading from the input pin
 int lastButtonState;                // the previous reading from the input pin
+
 //enum for all display states
 enum displayStates {
   Auto,
@@ -41,8 +56,8 @@ enum displayStates {
   Rendezvous,
   Maneuver
 };
-//Set display state to auto on startup
-int displayState = Auto;
+int displayState = Auto; //Set display state to auto on startup
+
 //situations the vessel can be in (used for auto display)
 enum Situations{
   PreLaunch = 0,
@@ -50,6 +65,7 @@ enum Situations{
   SubOrbital = 4,
   Orbiting = 5
 };
+
 //buffers for the displays
 char displaybuffer[12] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
 char databuffer[12] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
@@ -277,16 +293,69 @@ void writeDisplayBank1(char* buffer){
   display2.writeDigitAscii(3, buffer[11]);
 
 
-  display2.writeDisplay();
-  display1.writeDisplay();
   display0.writeDisplay();
+  display1.writeDisplay();
+  display2.writeDisplay();
 }
-
 // clears display bank 1
 void clearDisplayBank1(){
-  display2.clear();
-  display1.clear();
   display0.clear();
+  display1.clear();
+  display2.clear();
+}
+
+// writes to all displays in bank 2
+void writeDisplayBank2(char* buffer){
+  display3.writeDigitAscii(0, buffer[0]);
+  display3.writeDigitAscii(1, buffer[1]);
+  display3.writeDigitAscii(2, buffer[2]);
+  display3.writeDigitAscii(3, buffer[3]);
+  display4.writeDigitAscii(0, buffer[4]);
+  display4.writeDigitAscii(1, buffer[5]);
+  display4.writeDigitAscii(2, buffer[6]);
+  display4.writeDigitAscii(3, buffer[7]);
+  display5.writeDigitAscii(0, buffer[8]);
+  display5.writeDigitAscii(1, buffer[9]);
+  display5.writeDigitAscii(2, buffer[10]);
+  display5.writeDigitAscii(3, buffer[11]);
+
+
+  display3.writeDisplay();
+  display4.writeDisplay();
+  display5.writeDisplay();
+}
+// clears display bank 2
+void clearDisplayBank2(){
+  display3.clear();
+  display4.clear();
+  display5.clear();
+}
+
+// writes to all displays in bank 3
+void writeDisplayBank3(char* buffer){
+  display6.writeDigitAscii(0, buffer[0]);
+  display6.writeDigitAscii(1, buffer[1]);
+  display6.writeDigitAscii(2, buffer[2]);
+  display6.writeDigitAscii(3, buffer[3]);
+  display7.writeDigitAscii(0, buffer[4]);
+  display7.writeDigitAscii(1, buffer[5]);
+  display7.writeDigitAscii(2, buffer[6]);
+  display7.writeDigitAscii(3, buffer[7]);
+  display8.writeDigitAscii(0, buffer[8]);
+  display8.writeDigitAscii(1, buffer[9]);
+  display8.writeDigitAscii(2, buffer[10]);
+  display8.writeDigitAscii(3, buffer[11]);
+
+
+  display6.writeDisplay();
+  display7.writeDisplay();
+  display8.writeDisplay();
+}
+// clears display bank 3
+void clearDisplayBank3(){
+  display6.clear();
+  display7.clear();
+  display8.clear();
 }
 
 // converts arbitrary floats into a character array, with auto adjusting units
@@ -327,6 +396,7 @@ void floatToCharArray(char* buffer, float input, String unit) {
     buffer[offset - i - 1] = ' ';
   }
 }
+
 
 
 // handles incoming messages (duh)
@@ -444,17 +514,19 @@ void messageHandler(byte messageType, byte message[], byte messageSize)
 void setup()
 {
   // Open connection
-
   Serial.begin(115200);
-
-  // set up pins
-  pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(SAS_SWITCH_PIN, INPUT);
 
   // setup displays
   display0.begin(0x70);  // pass in the address
   display1.begin(0x71);
   display2.begin(0x72);
+
+
+  Bus2.begin();
+  display6.begin(0x74, 0, &Bus2);  
+  display7.begin(0x75, 0, &Bus2);
+  display8.begin(0x76, 0, &Bus2);
+
 
   // handshake with plugin, prints message to screen and turns of led when connected
   digitalWrite(LED_BUILTIN, HIGH);
@@ -507,14 +579,21 @@ void loop()
 
   //stagingButtonHandler(SAS_SWITCH_PIN);
 
-  // clear display banks 
+  //Write to displays!
   clearDisplayBank1();
-
-  floatToCharArray(databuffer, currentVelocity, "m/s");
+  floatToCharArray(databuffer, currentAltitudeSurface, "m");
   displayAlloc(databuffer,displaybuffer);
-
-  // write do display banks
   writeDisplayBank1(displaybuffer);
   
+  clearDisplayBank2();
+  floatToCharArray(databuffer, currentInclination, "deg");
+  displayAlloc(databuffer,displaybuffer);
+  writeDisplayBank2(displaybuffer);
+
+  clearDisplayBank3();
+  floatToCharArray(databuffer, currentVelocity, "m/s");
+  displayAlloc(databuffer,displaybuffer);
+  writeDisplayBank3(displaybuffer);
+
   delay(50);
 }

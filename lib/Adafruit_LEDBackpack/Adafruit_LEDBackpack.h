@@ -32,6 +32,8 @@
 
 #include "Adafruit_GFX.h"
 
+#include <SoftWire.h>
+
 #define LED_ON 1  ///< GFX color of lit LED segments (single-color displays)
 #define LED_OFF 0 ///< GFX color of unlit LED segments (single-color displays)
 
@@ -100,10 +102,11 @@ public:
             brightness).
     @param  _addr  I2C address.
     @param  theWire  TwoWire bus reference to use.
+    @param  softwareWire softWire bus reference to use
     @return  true if successful, otherwise false
 
   */
-  bool begin(uint8_t _addr = 0x70, TwoWire *theWire = &Wire);
+  bool begin(uint8_t _addr = 0x70, TwoWire *theWire = &Wire, SoftWire *softwareWire = 0);
 
   /*!
     @brief  Turn display on or off
