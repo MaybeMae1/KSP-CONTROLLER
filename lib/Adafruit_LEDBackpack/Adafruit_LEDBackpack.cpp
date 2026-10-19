@@ -288,14 +288,10 @@ void Adafruit_LEDBackpack::blinkRate(uint8_t b) {
 
 Adafruit_LEDBackpack::Adafruit_LEDBackpack(void) {}
 
-bool Adafruit_LEDBackpack::begin(uint8_t _addr, TwoWire *theWire, SoftWire *softwareWire) {
+bool Adafruit_LEDBackpack::begin(uint8_t _addr, TwoWire *theWire) {
   if (i2c_dev)
     delete i2c_dev;
-  if(theWire = 0){
-    i2c_dev = new Adafruit_I2CDevice(_addr, theWire);
-  } else{ 
   i2c_dev = new Adafruit_I2CDevice(_addr, theWire);
-  }
   if (!i2c_dev->begin())
     return false;
 

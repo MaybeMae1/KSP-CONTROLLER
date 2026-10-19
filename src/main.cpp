@@ -2,10 +2,8 @@
 #include "KerbalSimpit.h"
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include "Adafruit_LEDBackpack.h"
 #include <EasyStringStream.h>
-#include <SoftWire.h>
-
+#include <Adafruit_LEDBackpack.h>
 
 KerbalSimpit mySimpit(Serial);
 Adafruit_AlphaNum4 display0 = Adafruit_AlphaNum4();
@@ -18,9 +16,10 @@ Adafruit_AlphaNum4 display6 = Adafruit_AlphaNum4();
 Adafruit_AlphaNum4 display7 = Adafruit_AlphaNum4();
 Adafruit_AlphaNum4 display8 = Adafruit_AlphaNum4();
 
-SoftWire Bus2(12, 13);
 
 // VARIABLES
+
+const int displayBrightness = 7;
 
 // pins
 const int SAS_SWITCH_PIN = 1;
@@ -67,8 +66,8 @@ enum Situations{
 };
 
 //buffers for the displays
-char displaybuffer[12] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
-char databuffer[12] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+char displaybuffer[13] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+char databuffer[13] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
 
 
 // GAME DATA
@@ -102,9 +101,8 @@ float currentDurationNextManeuver;
 int currentSituation;
 bool hasTarget;
 
-
 // FUNCTIONS
-
+/*
 // dbPress_Toggle is a debounced button reader (from the arduino docs) modified to output as a integer
 int dbPress_Toggle(int input_pin)
 {
@@ -245,7 +243,7 @@ void throttleHandler(int potT, int deadzoneRange)
   /* DEPRECATED - the throttle slider is not linear, thus the curved mapping function gives more intuitive control over the throttle in game 
   // Convert it in KerbalSimpit range (only 0 -> INT16_MAX bc throttle cant be negative)
   int throttle = map(reading, 0, 1023, 0, INT16_MAX);
-  */
+  
 
   // Convert it into KerbalSimpit range, now with an exponential curve to account for non-linearity in the slider 
   int throttle = exp(.010163 * (-1 * reading));
@@ -269,13 +267,13 @@ void stagingButtonHandler(int pin){
   }
 
 }
-
+*/
 // moves data from data buffer to display buffer
+
 void displayAlloc(char* data,  char* buffer){
-  for(int i = 0; i < 12; i++ ){
-    buffer[i]=data[i];
-  }
+  buffer = data;
 }
+
 
 // writes to all displays in bank 1
 void writeDisplayBank1(char* buffer){
@@ -297,6 +295,7 @@ void writeDisplayBank1(char* buffer){
   display1.writeDisplay();
   display2.writeDisplay();
 }
+  
 // clears display bank 1
 void clearDisplayBank1(){
   display0.clear();
@@ -359,42 +358,45 @@ void clearDisplayBank3(){
 }
 
 // converts arbitrary floats into a character array, with auto adjusting units
-void floatToCharArray(char* buffer, float input, String unit) {
+void floatToCharArray(char* buffer, float input, const char* unit) {
+  const int WIDTH = 12;
+  char prefix = 0;
 
+  if (input >= 1000000.0f)      { input /= 1000000.0f; prefix = 'M'; }
+  else if (input >= 1000.0f)    { input /= 1000.0f;    prefix = 'K'; }
 
-  if(input > 1000000){
-    input = input / 1000000;
-    unit = "M" + unit;
-  } else if(input > 1000){
-    input = input / 1000;
-    unit = "K" + unit;
+  int unitLen = strlen(unit) + (prefix ? 1 : 0);
+  int room = WIDTH - unitLen;
+
+  memset(buffer, ' ', WIDTH);
+
+  if (room < 1) {                       // unit alone doesn't fit
+    memset(buffer, '#', WIDTH);
+    return;
   }
 
-
-  EasyStringStream ss(buffer, 12);
-  ss << input;
-  String str(ss.get());
-
-
-  int offset = 12 - str.length() - unit.length();
-  if(offset < 0){
-    floatToCharArray(buffer, input/10,unit);
+  // Try 3 decimals, then fewer, until the number fits
+  char num[24];
+  int len = 0;
+  for (int d = 3; d >= 0; d--) {
+    dtostrf(input, 0, d, num);
+    len = strlen(num);
+    if (len <= room) break;
   }
 
-
-  for(int i = 0; i < 12; i++){
-    buffer[i + offset] = str[i];
+  if (len > room) {                     // still too big
+    memset(buffer, '#', WIDTH);
+    return;
   }
 
+  // number, right-aligned just before the unit
+  int numStart = room - len;
+  memcpy(buffer + numStart, num, len);
 
-  for(int i = 0; i < unit.length(); i++){
-    buffer[12 - unit.length() + i] = unit[i];
-  }
-
-
-  for(int i = 0; i < offset; i++){
-    buffer[offset - i - 1] = ' ';
-  }
+  // prefix + unit at the end
+  int pos = room;
+  if (prefix) buffer[pos++] = prefix;
+  memcpy(buffer + pos, unit, strlen(unit));
 }
 
 
@@ -509,6 +511,7 @@ void messageHandler(byte messageType, byte message[], byte messageSize)
   }
 }
 
+
 // STUFF THAT RUNS
 
 void setup()
@@ -516,17 +519,34 @@ void setup()
   // Open connection
   Serial.begin(115200);
 
+
+  //Wire1.begin();
+
   // setup displays
-  display0.begin(0x70);  // pass in the address
-  display1.begin(0x71);
-  display2.begin(0x72);
 
-
-  Bus2.begin();
-  display6.begin(0x74, 0, &Bus2);  
-  display7.begin(0x75, 0, &Bus2);
-  display8.begin(0x76, 0, &Bus2);
-
+  display0.begin(0x71);  
+  display1.begin(0x77);
+  display2.begin(0x70);
+  /*
+  display3.begin(0x75);  
+  display4.begin(0x74);
+  display5.begin(0x70);
+  display6.begin(0x76);  
+  display7.begin(0x73);
+  display8.begin(0x72);
+  */
+ 
+  display0.setBrightness(displayBrightness);
+  display1.setBrightness(displayBrightness);
+  display2.setBrightness(displayBrightness);
+  /*
+  display3.setBrightness(displayBrightness);
+  display4.setBrightness(displayBrightness);
+  display5.setBrightness(displayBrightness);
+  display6.setBrightness(displayBrightness);
+  display7.setBrightness(displayBrightness);
+  display8.setBrightness(displayBrightness);
+  */
 
   // handshake with plugin, prints message to screen and turns of led when connected
   digitalWrite(LED_BUILTIN, HIGH);
@@ -541,14 +561,16 @@ void setup()
   mySimpit.inboundHandler(messageHandler);
 
   // tells the plugin to send certain messages regularly when in flight
-  mySimpit.registerChannel(ACTIONSTATUS_MESSAGE);
   mySimpit.registerChannel(ALTITUDE_MESSAGE);
   mySimpit.registerChannel(VELOCITY_MESSAGE);
+  mySimpit.registerChannel(ORBIT_MESSAGE);
+
 }
 
 void loop()
 {
   // Check for new messages
+
   mySimpit.update();
 
   /*
@@ -579,21 +601,17 @@ void loop()
 
   //stagingButtonHandler(SAS_SWITCH_PIN);
 
-  //Write to displays!
+  //Wrie to displays!
   clearDisplayBank1();
-  floatToCharArray(databuffer, currentAltitudeSurface, "m");
-  displayAlloc(databuffer,displaybuffer);
-  writeDisplayBank1(displaybuffer);
-  
+  floatToCharArray(databuffer, currentAltitudeSeaLevel, "m");
+  writeDisplayBank1(databuffer);
+  /*
   clearDisplayBank2();
-  floatToCharArray(databuffer, currentInclination, "deg");
-  displayAlloc(databuffer,displaybuffer);
-  writeDisplayBank2(displaybuffer);
-
+  floatToCharArray(databuffer, currentSurfaceVelocity, "m/S");
+  writeDisplayBank2(databuffer);
   clearDisplayBank3();
-  floatToCharArray(databuffer, currentVelocity, "m/s");
-  displayAlloc(databuffer,displaybuffer);
-  writeDisplayBank3(displaybuffer);
-
+  floatToCharArray(databuffer, currentInclination, "deg");
+  writeDisplayBank3(databuffer);
+  */
   delay(50);
 }
