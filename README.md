@@ -23,6 +23,4 @@ It is built off of 4 Arduino Uno R4 Minima boards, providing enough inputs and o
     
 The main body and frame of the controller is built from 3D printed PETG sections, screwed together using M3 fasteners and heat set inserts
 
-The top cover is one monolithic black ABS sheet. Holes for the buttons and switches are cut out using a CNC mill, and then the sheet is spray painted white. Finally, a laser cutter is used to burn away the spray paint to create black text.
-
 All code is written in C++ and the PlatformIO extension in VScode is used to upload the code onto the Arduinos.
