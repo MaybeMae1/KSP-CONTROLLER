@@ -581,14 +581,16 @@ void messageHandler(byte messageType, byte message[], byte messageSize)
 
 void setup()
 {
+
   // Open connection
+  // NEVER COMMENT OUT
   Serial.begin(115200);
-
-
-  //Wire1.begin();
 
   // setup displays
   
+  display0.begin(0x71);  
+  display1.begin(0x77);
+  display2.begin(0x70);
   
   display3.begin(0x75);  
   display4.begin(0x74);
@@ -598,17 +600,21 @@ void setup()
   display8.begin(0x72);
   
   
+  display0.setBrightness(displayBrightness);
+  display1.setBrightness(displayBrightness);
+  display2.setBrightness(displayBrightness);
   
   display3.setBrightness(displayBrightness);
   display4.setBrightness(displayBrightness);
   display5.setBrightness(displayBrightness);
+  
   display6.setBrightness(displayBrightness);
   display7.setBrightness(displayBrightness);
   display8.setBrightness(displayBrightness);
   
 
   // handshake with plugin, prints message to screen and turns of led when connected
-  
+  // NEVER COMMENT OUT EVERTHING BELOW
   digitalWrite(LED_BUILTIN, HIGH);
   while (!mySimpit.init())
   {
@@ -629,31 +635,11 @@ void setup()
 void loop()
 {
   // Check for new messages
-
+  //NEVER COMMENT OUT
   mySimpit.update();
 
-  /*
-  SAS_Switch_State = digitalRead(SAS_SWITCH_PIN);
-
-  if(SAS_Switch_State){
-    Desired_SAS_State = !Desired_SAS_State;
-  }
-  */
-
-  /*
-  Desired_SAS_State = dbPress_Toggle(SAS_SWITCH_PIN);
-
-  Update the SAS to match the state, only if a change is needed to avoid spamming commands.
-  if(Desired_SAS_State){
-    mySimpit.printToKSP("Activate SAS!");
-    mySimpit.activateAction(SAS_ACTION);
-  }
-  if(!Desired_SAS_State){
-    mySimpit.printToKSP("Deactivate SAS!");
-    mySimpit.deactivateAction(SAS_ACTION);
-  }
-  */
-  /*
+  
+  
   joystickRotation(X_Potentiometer, Y_Potentiometer, Z_Potentiometer, joystickDeadzone);
 
   throttleHandler(Throttle_Potentiometer, throttle_Deadzone);
@@ -665,15 +651,20 @@ void loop()
   sasButtonHandler(SAS_Pin);
 
   rscButtonHandler(RCS_Pin);
+
   //Write to displays!
-  */
-  
+  clearDisplayBank1();
+  floatToCharArray(databuffer, currentAltitudeSeaLevel, "m");
+  writeDisplayBank1(databuffer);
+
   clearDisplayBank2();
   floatToCharArray(databuffer, currentSurfaceVelocity, "m/S");
   writeDisplayBank2(databuffer);
+
   clearDisplayBank3();
   floatToCharArray(databuffer, currentInclination, "deg");
   writeDisplayBank3(databuffer);
-  
+
+  //NEVER COMMENT OUT
   delay(50);
 }
