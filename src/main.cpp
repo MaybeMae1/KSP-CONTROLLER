@@ -22,8 +22,11 @@ Adafruit_AlphaNum4 display8 = Adafruit_AlphaNum4();
 const int displayBrightness = 7;
 
 // pins
-const int SAS_SWITCH_PIN = 1;
-const int Alt_Warning_Pin = 2;
+const int Abort_Pin = 0;
+const int Stage_Pin = 1;
+const int SAS_Pin = 13;
+const int RCS_Pin = 12;
+const int Alt_Warning_Pin = 7;
 
 // misc
 bool SAS_Switch_State;
@@ -31,14 +34,14 @@ bool Desired_SAS_State;
 byte currentActionStatus;
 
 // joystick variables
-const int X_Potentiometer = A0;
-const int Y_Potentiometer = A1;
+const int X_Potentiometer = A1;
+const int Y_Potentiometer = A0;
 const int Z_Potentiometer = A2;
-const int joystickDeadzone = 4000;
+const int joystickDeadzone = 5000;
 
 // throttle variables
 const int Throttle_Potentiometer = A3;
-const int throttle_Deadzone = 3000;
+const int throttle_Deadzone = 5500;
 // dbPress_Toggle variables
 
 unsigned long lastDebounceTime = 0; // the last time the output pin was toggled
@@ -46,6 +49,7 @@ unsigned long debounceDelay = 50;   // the debounce time; increase if the output
 int outputState;                    // the current state of the output pin
 int buttonState;                    // the current reading from the input pin
 int lastButtonState;                // the previous reading from the input pin
+int lastPressTime;
 
 //enum for all display states
 enum displayStates {
@@ -102,7 +106,27 @@ int currentSituation;
 bool hasTarget;
 
 // FUNCTIONS
-/*
+
+// dbPress is a debounced button reader (from the arduino docs) modified to output as a integer
+int dbPress(int input_pin)
+{
+  // "borrowed" from the arduino docs bc im not a good programmer
+  int reading = digitalRead(input_pin);
+
+  // check to see if you just pressed the button
+  // (i.e. the input went from LOW to HIGH), and you've waited long enough
+  // since the last press to ignore any noise:
+  if ((millis() - lastDebounceTime) > debounceDelay)
+  {
+    outputState = reading;
+  }
+
+  // save the reading. Next time through the loop, it'll be the lastButtonState:
+  lastButtonState = reading;
+
+  return outputState;
+}
+
 // dbPress_Toggle is a debounced button reader (from the arduino docs) modified to output as a integer
 int dbPress_Toggle(int input_pin)
 {
@@ -170,8 +194,9 @@ void joystickRotation(int potX, int potY, int potZ, int deadzoneRange)
 
   // Convert them in KerbalSimpit range
   int16_t pitch = map(reading_pitch, 0, 1023, INT16_MIN, INT16_MAX);
-  int16_t yaw = map(reading_roll, 0, 1023, INT16_MIN, INT16_MAX);
-  int16_t roll = yawMap(reading_yaw);
+  int16_t yaw = 0;
+  int16_t roll = 0;
+  
 
   // Add a deadzone for the axes
   if (-1 * deadzoneRange < pitch && pitch < deadzoneRange)
@@ -187,10 +212,16 @@ void joystickRotation(int potX, int potY, int potZ, int deadzoneRange)
     yaw = 0;
   };
 
+  if(digitalRead(10) == LOW){
+    pitch = pitch / 2;
+  }
+
   // do some black magic to tell the game how we want to move
-  rot_msg.setPitch(-pitch);
+  rot_msg.setPitch(pitch);
   rot_msg.setRoll(roll);
   rot_msg.setYaw(yaw);
+  //Serial.print("Y: "); Serial.print(reading_y); Serial.print(" "); //Serial.println(y);
+  //Serial.print("Z: "); Serial.print(reading_z); Serial.print(" "); Serial.println(z);
   mySimpit.send(ROTATION_MESSAGE, rot_msg);
 }
 
@@ -206,11 +237,12 @@ void joystickTranslation(int potX, int potY, int potZ, int deadzoneRange)
   int reading_z = analogRead(potZ);
 
   // Convert them in KerbalSimpit range
-  int16_t x = map(reading_x, 0, 1023, INT16_MIN, INT16_MAX);
-  int16_t y = map(reading_y, 0, 1023, INT16_MIN, INT16_MAX);
+  int x = map(reading_x, 0, 1023, INT16_MIN, INT16_MAX);
+  int y = map(reading_y, 0, 1023, INT16_MIN, INT16_MAX);
   int16_t z = yawMap(reading_z);
 
   // Add a deadzone for the axes
+  /*
   if (-1 * deadzoneRange < x && x < deadzoneRange)
   {
     x = 0;
@@ -223,12 +255,16 @@ void joystickTranslation(int potX, int potY, int potZ, int deadzoneRange)
   {
     z = 0;
   };
-
+  */
   // do some black magic to tell the game how we want to move
   trans_msg.setX(x);
   trans_msg.setY(y);
   trans_msg.setZ(z);
-  mySimpit.send(TRANSLATION_MESSAGE, trans_msg);
+  Serial.print("X: "); //Serial.print(reading_x); Serial.print(" "); 
+  Serial.println(x);
+  //Serial.print("Y: "); Serial.print(reading_y); Serial.print(" "); //Serial.println(y);
+  //Serial.print("Z: "); Serial.print(reading_z); Serial.print(" "); Serial.println(z);
+  //mySimpit.send(TRANSLATION_MESSAGE, trans_msg);
 }
 
 // handles throttle inputs (its practically the joystick code, just with only one input lol)
@@ -240,40 +276,71 @@ void throttleHandler(int potT, int deadzoneRange)
   // Read the value of the potentiometer
   int reading = analogRead(potT);
 
-  /* DEPRECATED - the throttle slider is not linear, thus the curved mapping function gives more intuitive control over the throttle in game 
+  // DEPRECATED - the throttle slider is not linear, thus the curved mapping function gives more intuitive control over the throttle in game 
   // Convert it in KerbalSimpit range (only 0 -> INT16_MAX bc throttle cant be negative)
-  int throttle = map(reading, 0, 1023, 0, INT16_MAX);
+  int throttle = map(reading, 1017, 1023, 0, INT16_MAX);
   
 
   // Convert it into KerbalSimpit range, now with an exponential curve to account for non-linearity in the slider 
-  int throttle = exp(.010163 * (-1 * reading));
+  //int throttle = exp(.010163 * (-1 * reading));
 
   // Add a deadzone for the axis
+  
   if (throttle < deadzoneRange)
   {
     throttle = 0;
   };
-
+  
   // Send the message
   throttle_msg.throttle = throttle;
+  //Serial.print("Throttle: "); Serial.print(reading); Serial.print(" "); Serial.println(throttle);
   mySimpit.send(THROTTLE_MESSAGE, throttle_msg);
 }
 
 // handles the staging button :mind_blown:
 void stagingButtonHandler(int pin){
 
-  if(dbPress_Toggle(pin)){
+  if(dbPress(pin)){
     mySimpit.activateAction(STAGE_ACTION);
   }
 
 }
-*/
-// moves data from data buffer to display buffer
 
+// handles the abort button :mind_blown:
+void abortButtonHandler(int pin){
+
+  if(dbPress(pin)){
+    mySimpit.activateAction(ABORT_ACTION);
+  }
+
+}
+
+// handles the sas button :mind_blown:
+void sasButtonHandler(int pin){
+
+  if(!dbPress(pin)){
+    mySimpit.activateAction(SAS_ACTION);
+  }
+  if(dbPress(pin)){
+    mySimpit.deactivateAction(SAS_ACTION);
+  }
+}
+
+// handles the rcs button :mind_blown:
+void rscButtonHandler(int pin){
+
+  if(dbPress(pin)){
+    mySimpit.activateAction(RCS_ACTION);
+  }
+  if(!dbPress(pin)){
+    mySimpit.deactivateAction(RCS_ACTION);
+  }
+}
+
+// moves data from data buffer to display buffer
 void displayAlloc(char* data,  char* buffer){
   buffer = data;
 }
-
 
 // writes to all displays in bank 1
 void writeDisplayBank1(char* buffer){
@@ -399,8 +466,6 @@ void floatToCharArray(char* buffer, float input, const char* unit) {
   memcpy(buffer + pos, unit, strlen(unit));
 }
 
-
-
 // handles incoming messages (duh)
 // dont even dare ask me how it works, im just looking at the docs for simpit lol
 void messageHandler(byte messageType, byte message[], byte messageSize)
@@ -523,32 +588,27 @@ void setup()
   //Wire1.begin();
 
   // setup displays
-
-  display0.begin(0x71);  
-  display1.begin(0x77);
-  display2.begin(0x70);
-  /*
+  
+  
   display3.begin(0x75);  
   display4.begin(0x74);
   display5.begin(0x70);
   display6.begin(0x76);  
   display7.begin(0x73);
   display8.begin(0x72);
-  */
- 
-  display0.setBrightness(displayBrightness);
-  display1.setBrightness(displayBrightness);
-  display2.setBrightness(displayBrightness);
-  /*
+  
+  
+  
   display3.setBrightness(displayBrightness);
   display4.setBrightness(displayBrightness);
   display5.setBrightness(displayBrightness);
   display6.setBrightness(displayBrightness);
   display7.setBrightness(displayBrightness);
   display8.setBrightness(displayBrightness);
-  */
+  
 
   // handshake with plugin, prints message to screen and turns of led when connected
+  
   digitalWrite(LED_BUILTIN, HIGH);
   while (!mySimpit.init())
   {
@@ -556,12 +616,11 @@ void setup()
   }
   mySimpit.printToKSP("Connected", PRINT_TO_SCREEN);
   digitalWrite(LED_BUILTIN, LOW);
-
+  
   // tells the library to run the messageHandler function when receiving messages
   mySimpit.inboundHandler(messageHandler);
 
   // tells the plugin to send certain messages regularly when in flight
-  mySimpit.registerChannel(ALTITUDE_MESSAGE);
   mySimpit.registerChannel(VELOCITY_MESSAGE);
   mySimpit.registerChannel(ORBIT_MESSAGE);
 
@@ -590,28 +649,31 @@ void loop()
     mySimpit.activateAction(SAS_ACTION);
   }
   if(!Desired_SAS_State){
-    mySimpit.printToKSP("Desactivate SAS!");
+    mySimpit.printToKSP("Deactivate SAS!");
     mySimpit.deactivateAction(SAS_ACTION);
   }
   */
-
-  //joystickRotation(X_Potentiometer, Y_Potentiometer, Z_Potentiometer, joystickDeadzone);
-
-  //throttleHandler(Throttle_Potentiometer, throttle_Deadzone);
-
-  //stagingButtonHandler(SAS_SWITCH_PIN);
-
-  //Wrie to displays!
-  clearDisplayBank1();
-  floatToCharArray(databuffer, currentAltitudeSeaLevel, "m");
-  writeDisplayBank1(databuffer);
   /*
+  joystickRotation(X_Potentiometer, Y_Potentiometer, Z_Potentiometer, joystickDeadzone);
+
+  throttleHandler(Throttle_Potentiometer, throttle_Deadzone);
+
+  abortButtonHandler(Abort_Pin);
+
+  stagingButtonHandler(Stage_Pin);
+
+  sasButtonHandler(SAS_Pin);
+
+  rscButtonHandler(RCS_Pin);
+  //Write to displays!
+  */
+  
   clearDisplayBank2();
   floatToCharArray(databuffer, currentSurfaceVelocity, "m/S");
   writeDisplayBank2(databuffer);
   clearDisplayBank3();
   floatToCharArray(databuffer, currentInclination, "deg");
   writeDisplayBank3(databuffer);
-  */
+  
   delay(50);
 }
