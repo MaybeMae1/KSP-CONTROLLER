@@ -23,6 +23,10 @@ It is built off of 2 Arduino Uno R4 Minima boards, providing enough inputs and o
     
 The main body and frame of the controller is built from 3D printed PETG sections glued together, with hardware attached via m3 fasteners and heat set inserts.
 
+All code is written in C++ and the PlatformIO extension in VScode is used to upload the code onto the Arduinos.
+
+# Instructions
+
 To build the top cover
 1. Spraypaint one ABS Sheet white
 2. Use a cnc router and the included top cover file to cut the holes
@@ -39,4 +43,9 @@ To build the rest of the case
 5. Take the leftovers from cutting down the side pieces and cut them into smaller chunks, about 1.5 inches by 1.5 inches
 6. Glue 4 of these chunks into the top corners of the case, and glue the rest wherever elsew you would like along the top perimeter (these are where the top cover rests.
 
-All code is written in C++ and the PlatformIO extension in VScode is used to upload the code onto the Arduinos.
+To wire everything
+- Simply follow the wiring diagram included in the KiCAD files
+
+To get the code working
+- Comment or uncomment functions in the main() loop depending on whats connected to that specific arduino
+i.e. The joystick and throttle are connected to one arduino, so comment everything except for the joystick and throttle handlers.
