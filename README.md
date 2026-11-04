@@ -6,6 +6,7 @@ This project aims to create a custom controller for the game Kerbal Space Progra
 This repository contains all code files for each arduino board in the controller, files for all 3d printed parts, a list of components needed to purchase, and instructions for how to build your own!
 
 <img width="1408" height="1008" alt="Screenshot 2026-06-04 054627" src="https://github.com/user-attachments/assets/091b7b62-f863-48ef-9968-fe734054d668" />
+<img width="675" height="900" alt="image" src="https://github.com/user-attachments/assets/bf1681bb-b1ae-4980-a104-f9a45fac045e" />
 
 # Specifics
  <a href="https://docs.google.com/document/d/1xSK9mFhKcA0diG72t0lU2Y3A8E2znB5cS-Skv4FzVgU">Parts List</a> 
