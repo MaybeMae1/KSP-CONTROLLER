@@ -8,6 +8,10 @@ This repository contains all code files for each arduino board in the controller
 <img width="1408" height="1008" alt="Screenshot 2026-06-04 054627" src="https://github.com/user-attachments/assets/091b7b62-f863-48ef-9968-fe734054d668" />
 <img width="675" height="900" alt="image" src="https://github.com/user-attachments/assets/bf1681bb-b1ae-4980-a104-f9a45fac045e" />
 
+
+#Wiring Diagram
+<img width="1366" height="768" alt="Screenshot from 2026-11-13 10-47-56" src="https://github.com/user-attachments/assets/e5ee4f50-5e68-4c51-8cdb-8ebed54cda8a" />
+
 # Bill of Materials
 <a href="https://docs.google.com/document/d/1xSK9mFhKcA0diG72t0lU2Y3A8E2znB5cS-Skv4FzVgU"> 3 Axis Joystick - x1 </a> <br>
 <a href="https://reverb.com/item/90753295-behringer-b103-75mm-mixer-slider">Linear Slider - x1 </a> <br>
